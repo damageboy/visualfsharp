@@ -568,6 +568,8 @@ namespace Microsoft.VisualStudio.FSharp.ProjectSystem
 
         private Microsoft.Build.Evaluation.Project buildProject;
 
+        private Microsoft.Build.Evaluation.Project userBuildProject;
+
         // TODO cache an instance for perf; but be sure not to be stale (correctness)
         //private ProjectInstance projectInstance;
         private BuildActionConverter buildActionConverter = new BuildActionConverter();
@@ -1336,9 +1338,25 @@ namespace Microsoft.VisualStudio.FSharp.ProjectSystem
         }
 
         /// <summary>
+        /// Defines the user's build project that has loaded the project file.
+        /// </summary>
+        public /*protected internal, but public for FSharp.Project.dll*/ Microsoft.Build.Evaluation.Project UserBuildProject
+        {
+            get
+            {
+                if (userBuildProject == null && File.Exists(UserFileName))
+                    CreateUserBuildProject();
+
+                return userBuildProject;
+            }        
+        }
+
+
+        /// <summary>
         /// Defines the build engine that is used to build the project file.
         /// </summary>
-        /*internal, but public for FSharp.Project.dll*/ public Microsoft.Build.Evaluation.ProjectCollection BuildEngine
+        /*internal, but public for FSharp.Project.dll*/
+        public Microsoft.Build.Evaluation.ProjectCollection BuildEngine
         {
             get
             {
@@ -1967,6 +1985,26 @@ namespace Microsoft.VisualStudio.FSharp.ProjectSystem
         }
 
         #region virtual methods
+
+        public virtual Microsoft.Build.Evaluation.Project GetOrCreateUserBuildProject()
+        {
+            var userBuildProject = UserBuildProject;
+            if (userBuildProject == null)
+                this.userBuildProject = CreateUserBuildProject();
+
+            return UserBuildProject;
+        }
+
+        protected virtual Microsoft.Build.Evaluation.Project CreateUserBuildProject()
+        {
+            if (!File.Exists(UserFileName))
+            {
+                Microsoft.Build.Evaluation.Project userBuildProject = new Microsoft.Build.Evaluation.Project();
+                userBuildProject.Save(UserFileName);
+            }
+
+            return BuildEngine.LoadProject(UserFileName);
+        }
 
         /// <summary>
         /// Executes a wizard.
@@ -4158,6 +4196,15 @@ namespace Microsoft.VisualStudio.FSharp.ProjectSystem
 
             MSBuildProject.SetGlobalProperty(this.buildProject, ProjectFileConstants.Configuration, configCanonicalName.ConfigName);
             MSBuildProject.SetGlobalProperty(this.buildProject, ProjectFileConstants.Platform, configCanonicalName.MSBuildPlatform);
+
+            var userBuildProject = UserBuildProject;
+            if (userBuildProject != null)
+            {
+                userBuildProject.SetGlobalProperty(ProjectFileConstants.Configuration, configCanonicalName.ConfigName);
+                userBuildProject.SetGlobalProperty(ProjectFileConstants.Platform, configCanonicalName.MSBuildPlatform);
+            }
+
+
             this.UpdateMSBuildState();
         }
 
@@ -5147,6 +5194,11 @@ namespace Microsoft.VisualStudio.FSharp.ProjectSystem
             if (setProjectFileDirtyAfterSave)
             {
                 this.SetProjectFileDirty(true);
+            }
+
+            if (result == VSConstants.S_OK && userBuildProject != null)
+            {
+                userBuildProject.Save(UserFileName);
             }
 
             return result;
@@ -6877,7 +6929,15 @@ namespace Microsoft.VisualStudio.FSharp.ProjectSystem
            return false;
         }
 
-        private bool IsIdeInCommandLineMode()
+        public string UserFileName
+        {
+            get
+            {
+                return FileName + PerUserFileExtension;
+            }
+        }
+
+private bool IsIdeInCommandLineMode()
         {
             bool cmdline = false;
             var shell = this.site.GetService(typeof(SVsShell)) as IVsShell;

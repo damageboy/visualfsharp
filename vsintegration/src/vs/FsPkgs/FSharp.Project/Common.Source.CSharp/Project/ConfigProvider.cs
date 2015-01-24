@@ -184,7 +184,7 @@ namespace Microsoft.VisualStudio.FSharp.ProjectSystem
 
             // Get all configs
             this.project.BuildProject.ReevaluateIfNecessary();
-            List<Microsoft.Build.Construction.ProjectPropertyGroupElement> configGroup = new List<Microsoft.Build.Construction.ProjectPropertyGroupElement>(this.project.BuildProject.Xml.PropertyGroups);
+            List<Microsoft.Build.Construction.ProjectPropertyGroupElement> configGroup = new List<Microsoft.Build.Construction.ProjectPropertyGroupElement>(GetBuildProjectXmlPropertyGroups());
             // platform -> property group
             var configToClone = new Dictionary<string,Microsoft.Build.Construction.ProjectPropertyGroupElement>(StringComparer.Ordinal);
 
@@ -296,7 +296,7 @@ namespace Microsoft.VisualStudio.FSharp.ProjectSystem
 
             // Get all configs
             this.project.BuildProject.ReevaluateIfNecessary();
-            List<Microsoft.Build.Construction.ProjectPropertyGroupElement> configGroup = new List<Microsoft.Build.Construction.ProjectPropertyGroupElement>(this.project.BuildProject.Xml.PropertyGroups);
+            List<Microsoft.Build.Construction.ProjectPropertyGroupElement> configGroup = new List<Microsoft.Build.Construction.ProjectPropertyGroupElement>(GetBuildProjectXmlPropertyGroups());
             // configName -> property group
             var configToClone = new Dictionary<string, Microsoft.Build.Construction.ProjectPropertyGroupElement>(StringComparer.Ordinal);
 
@@ -384,7 +384,7 @@ namespace Microsoft.VisualStudio.FSharp.ProjectSystem
             }
 
             this.project.BuildProject.ReevaluateIfNecessary();
-            var configGroups = new List<Microsoft.Build.Construction.ProjectPropertyGroupElement>(this.project.BuildProject.Xml.PropertyGroups);
+            var configGroups = new List<Microsoft.Build.Construction.ProjectPropertyGroupElement>(GetBuildProjectXmlPropertyGroups());
             var groupsToDelete = new List<Microsoft.Build.Construction.ProjectPropertyGroupElement>();
 
             foreach (var config in configGroups)
@@ -407,6 +407,16 @@ namespace Microsoft.VisualStudio.FSharp.ProjectSystem
             return VSConstants.S_OK;
         }
 
+        protected virtual IEnumerable<Microsoft.Build.Construction.ProjectPropertyGroupElement> GetBuildProjectXmlPropertyGroups(bool includeUserBuildProjects = true)
+        {
+            IEnumerable<Microsoft.Build.Construction.ProjectPropertyGroupElement> result = project.BuildProject.Xml.PropertyGroups;
+            if (includeUserBuildProjects && ProjectMgr.UserBuildProject != null)
+                result = result.Concat(ProjectMgr.UserBuildProject.Xml.PropertyGroups);
+
+            return result;
+        }
+
+
         /// <summary>
         /// Deletes a specified platform name. 
         /// </summary>
@@ -427,7 +437,7 @@ namespace Microsoft.VisualStudio.FSharp.ProjectSystem
             }
 
             this.project.BuildProject.ReevaluateIfNecessary();
-            var configGroups = new List<Microsoft.Build.Construction.ProjectPropertyGroupElement>(this.project.BuildProject.Xml.PropertyGroups);
+            var configGroups = new List<Microsoft.Build.Construction.ProjectPropertyGroupElement>(GetBuildProjectXmlPropertyGroups());
             var groupsToDelete = new List<Microsoft.Build.Construction.ProjectPropertyGroupElement>();
 
             foreach (var config in configGroups)
@@ -624,7 +634,7 @@ namespace Microsoft.VisualStudio.FSharp.ProjectSystem
         public virtual int RenameCfgsOfCfgName(string old, string newname)
         {
             this.project.BuildProject.ReevaluateIfNecessary();
-            foreach (var config in this.project.BuildProject.Xml.PropertyGroups)
+            foreach (var config in GetBuildProjectXmlPropertyGroups())
             {
                 // Only care about conditional property groups
                 if (config.Condition == null || config.Condition.Length == 0)
